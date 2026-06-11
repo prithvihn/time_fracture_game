@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TIME FRACTURE — Temporal Research Facility</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="game-canvas"></canvas>
+    <div id="timeline-flash" aria-hidden="true"></div>
+
+    <!-- Win fade overlay -->
+    <div id="win-fade" aria-hidden="true"></div>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+      <header id="title-bar">
+        <h1>TIME FRACTURE</h1>
+        <div id="title-line"></div>
+      </header>
+
+      <div id="timeline-panel">
+        <span class="panel-label">CURRENT TIMELINE</span>
+        <span id="timeline-value" class="timeline-past">◈ PAST</span>
+      </div>
+
+      <div id="room-indicator">
+        <span id="room-text">SECTOR 01 / BRIDGE</span>
+        <span id="room-hint">Stay in PAST — cross the green bridge, then walk forward</span>
+      </div>
+
+      <div id="controls-panel">
+        <div class="controls-header">SYS:INPUT v2.4</div>
+        <div class="controls-line">&gt; [Q] PAST&nbsp;&nbsp;&nbsp;&nbsp;[E] FUTURE</div>
+        <div class="controls-line">&gt; [WASD] MOVE&nbsp;&nbsp;[MOUSE] LOOK</div>
+        <div id="interact-control-line" class="controls-line hidden">&gt; [F] INTERACT</div>
+      </div>
+
+      <div id="interaction-prompt" class="hidden">
+        [F] ACTIVATE POWER RELAY
+      </div>
+    </div>
+
+    <!-- Start overlay -->
+    <div id="start-overlay">
+      <div class="scanlines"></div>
+      <div class="start-content">
+        <h1 id="glitch-title" data-text="TIME FRACTURE">TIME FRACTURE</h1>
+        <p class="start-subtitle">TEMPORAL RESEARCH FACILITY — SECTOR 7</p>
+        <p class="start-lore">EXPERIMENT TR-9 HAS FAILED. TIME IS COLLAPSING.</p>
+        <p class="start-credit">QUAD_CODERS · INNOVOTSAVA 2026</p>
+        <p id="start-prompt">[ CLICK TO BEGIN ]</p>
+        <div class="start-controls-box">
+          <div>[Q] PAST TIMELINE &nbsp;|&nbsp; [E] FUTURE TIMELINE</div>
+          <div>[WASD] MOVE &nbsp;|&nbsp; [MOUSE] LOOK &nbsp;|&nbsp; [F] INTERACT</div>
+          <div>Switch timelines to solve puzzles and escape.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Win overlay -->
+    <div id="win-overlay" class="hidden">
+      <div id="win-particles"></div>
+      <div class="win-content">
+        <div class="win-checkmark"></div>
+        <h2 id="win-title">TIMELINE RESTORED</h2>
+        <p id="win-subtitle">YOU ESCAPED THE TIME LOOP</p>
+        <div id="win-stats">
+          <div>TIMELINE SWITCHES: <span id="stat-switches">0</span></div>
+          <div>ROOMS CLEARED: <span id="stat-rooms">3/3</span></div>
+        </div>
+        <p class="win-credit">TIME FRACTURE · QUAD_CODERS · INNOVOTSAVA 2026</p>
+        <button id="play-again-btn">[ PLAY AGAIN ]</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/PointerLockControls.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
