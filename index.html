@@ -29,6 +29,24 @@
         <span id="timeline-value" class="timeline-past">◈ PAST</span>
       </div>
 
+      <div id="stability-panel">
+        <span class="panel-label">TIME STABILITY</span>
+        <div id="stability-bar-container">
+          <div id="stability-bar-fill"></div>
+        </div>
+        <span id="stability-value">100%</span>
+      </div>
+
+      <div id="energy-node-panel" class="hidden">
+        <span class="panel-label">ENERGY NODES</span>
+        <span id="energy-node-value">0 / 3</span>
+      </div>
+
+      <div id="memory-panel">
+        <span class="panel-label">MEMORY FRAGMENTS</span>
+        <span id="memory-value">0 / 3</span>
+      </div>
+
       <div id="room-indicator">
         <span id="room-text">SECTOR 01 / BRIDGE</span>
         <span id="room-hint">Stay in PAST — cross the green bridge, then walk forward</span>
@@ -44,6 +62,50 @@
       <div id="interaction-prompt" class="hidden">
         [F] ACTIVATE POWER RELAY
       </div>
+
+      <!-- Challenge Timer -->
+      <div id="challenge-timer" class="hidden">
+        <span class="panel-label">TIME</span>
+        <span id="timer-value">00:00</span>
+      </div>
+
+      <!-- Sector Intro Popup -->
+      <div id="sector-intro" class="hidden">
+        <div id="sector-intro-label">SECTOR 01</div>
+        <div id="sector-intro-name">BRIDGE CHAMBER</div>
+      </div>
+
+      <!-- Achievement Toast -->
+      <div id="achievement-toast" class="hidden">
+        <div class="achievement-icon">◆</div>
+        <div class="achievement-body">
+          <div id="achievement-title"></div>
+          <div id="achievement-desc"></div>
+        </div>
+      </div>
+
+      <!-- Temporal Lock message for false portal -->
+      <div id="temporal-lock-msg" class="hidden">
+        <div class="lock-title">⚠ TEMPORAL LOCK DETECTED</div>
+        <div class="lock-hint">Timeline Mismatch — Switch Timeline</div>
+      </div>
+
+      <!-- Memory Fragment popup -->
+      <div id="memory-popup" class="hidden">
+        <div class="memory-popup-title"></div>
+        <div class="memory-popup-text"></div>
+      </div>
+
+      <!-- Temporal Collapse overlay -->
+      <div id="temporal-collapse" class="hidden">
+        <div class="collapse-content">
+          <div class="collapse-title">TEMPORAL COLLAPSE</div>
+          <div class="collapse-subtitle">Reality Has Failed</div>
+        </div>
+      </div>
+
+      <!-- Chromatic distortion overlay -->
+      <div id="chromatic-overlay" aria-hidden="true"></div>
     </div>
 
     <!-- Start overlay -->
@@ -54,6 +116,14 @@
         <p class="start-subtitle">TEMPORAL RESEARCH FACILITY — SECTOR 7</p>
         <p class="start-lore">EXPERIMENT TR-9 HAS FAILED. TIME IS COLLAPSING.</p>
         <p class="start-credit">QUAD_CODERS · INNOVOTSAVA 2026</p>
+        <div id="best-time-display" class="hidden">
+          <span class="panel-label">BEST TIME</span>
+          <span id="best-time-value">--:--</span>
+        </div>
+        <div id="mode-select">
+          <button id="btn-story" class="mode-btn mode-btn-active">◈ STORY MODE</button>
+          <button id="btn-challenge" class="mode-btn">⏱ CHALLENGE MODE</button>
+        </div>
         <p id="start-prompt">[ CLICK TO BEGIN ]</p>
         <div class="start-controls-box">
           <div>[Q] PAST TIMELINE &nbsp;|&nbsp; [E] FUTURE TIMELINE</div>
@@ -67,14 +137,29 @@
     <div id="win-overlay" class="hidden">
       <div id="win-particles"></div>
       <div class="win-content">
-        <div class="win-checkmark"></div>
-        <h2 id="win-title">TIMELINE RESTORED</h2>
-        <p id="win-subtitle">YOU ESCAPED THE TIME LOOP</p>
-        <div id="win-stats">
-          <div>TIMELINE SWITCHES: <span id="stat-switches">0</span></div>
-          <div>ROOMS CLEARED: <span id="stat-rooms">3/3</span></div>
+        <div class="win-emblem">
+          <div class="win-checkmark"></div>
         </div>
-        <p class="win-credit">TIME FRACTURE · QUAD_CODERS · INNOVOTSAVA 2026</p>
+        <h1 id="win-game-title">TIME FRACTURE</h1>
+        <h2 id="win-title">TIMELINE RESTORED</h2>
+        <p id="win-subtitle">You Escaped The Time Loop</p>
+        <div id="win-stats">
+          <div>MEMORY FRAGMENTS: <span id="stat-fragments">0 / 3</span></div>
+          <div>FINAL STABILITY: <span id="stat-stability">100%</span></div>
+          <div class="win-stat-divider"></div>
+          <div>TIMELINE SWITCHES: <span id="stat-switches">0</span></div>
+          <div>PAST USAGE: <span id="stat-past-usage">0</span></div>
+          <div>FUTURE USAGE: <span id="stat-future-usage">0</span></div>
+          <div class="win-stat-divider"></div>
+          <div id="stat-time-row" class="hidden">COMPLETION TIME: <span id="stat-time">--:--</span></div>
+          <div id="stat-medal-row" class="hidden">
+            <div class="win-stat-divider"></div>
+            <div class="medal-label">MISSION RATING</div>
+            <div id="stat-medal" class="medal-display"></div>
+          </div>
+        </div>
+        <p class="win-team">Quad_Coders</p>
+        <p class="win-event">Innovotsava 2026</p>
         <button id="play-again-btn">[ PLAY AGAIN ]</button>
       </div>
     </div>

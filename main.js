@@ -73,13 +73,31 @@ const gameState = {
   currentRoom: 0,
   playing: false,
   won: false,
-  respawnCooldown: 0
+  respawnCooldown: 0,
+  // Feature 1: Time Stability
+  stability: 100,
+  // Feature 2: Energy Nodes
+  energyNodes: { a: false, b: false, c: false },
+  energyNodesComplete: false,
+  // Feature 4: Memory Fragments
+  memoryFragments: 0,
+  // Feature 5: False Portal
+  falsePortalTriggered: false,
+  realPortalSpawned: false,
+  // New Features
+  challengeMode: false,
+  timerStartTime: 0,
+  completionTime: 0,
+  pastUsage: 0,
+  futureUsage: 0,
+  sectorsVisited: [false, false, false],
+  achievements: {}
 };
 
 const ROOM_ZONES = [
   { min: 0, max: -20, label: 'SECTOR 01 / BRIDGE', hint: 'Stay in PAST — cross the green bridge, then walk forward' },
-  { min: -20, max: -40, label: 'SECTOR 02 / RELAY', hint: 'PAST: press F at the switch · FUTURE: door opens after activation' },
-  { min: -40, max: -60, label: 'SECTOR 03 / ESCAPE', hint: 'Switch to FUTURE — wall vanishes, enter the portal' }
+  { min: -20, max: -40, label: 'SECTOR 02 / ENERGY CORE', hint: 'Activate all 3 Energy Nodes across timelines' },
+  { min: -40, max: -60, label: 'SECTOR 03 / ESCAPE', hint: 'Find the correct timeline to escape' }
 ];
 
 const COLORS = {
@@ -114,6 +132,40 @@ const winFade = document.getElementById('win-fade');
 const winOverlay = document.getElementById('win-overlay');
 const statSwitches = document.getElementById('stat-switches');
 const playAgainBtn = document.getElementById('play-again-btn');
+
+// New DOM references for features
+const stabilityBarFill = document.getElementById('stability-bar-fill');
+const stabilityValue = document.getElementById('stability-value');
+const energyNodePanel = document.getElementById('energy-node-panel');
+const energyNodeValue = document.getElementById('energy-node-value');
+const memoryPanel = document.getElementById('memory-panel');
+const memoryValue = document.getElementById('memory-value');
+const memoryPopup = document.getElementById('memory-popup');
+const temporalCollapse = document.getElementById('temporal-collapse');
+const temporalLockMsg = document.getElementById('temporal-lock-msg');
+const chromaticOverlay = document.getElementById('chromatic-overlay');
+const statFragments = document.getElementById('stat-fragments');
+const statStability = document.getElementById('stat-stability');
+
+// Feature 1+2+3+4+5+6+7+8: New DOM refs
+const challengeTimer = document.getElementById('challenge-timer');
+const timerValue = document.getElementById('timer-value');
+const btnStory = document.getElementById('btn-story');
+const btnChallenge = document.getElementById('btn-challenge');
+const bestTimeDisplay = document.getElementById('best-time-display');
+const bestTimeValue = document.getElementById('best-time-value');
+const sectorIntro = document.getElementById('sector-intro');
+const sectorIntroLabel = document.getElementById('sector-intro-label');
+const sectorIntroName = document.getElementById('sector-intro-name');
+const achievementToast = document.getElementById('achievement-toast');
+const achievementTitle = document.getElementById('achievement-title');
+const achievementDesc = document.getElementById('achievement-desc');
+const statPastUsage = document.getElementById('stat-past-usage');
+const statFutureUsage = document.getElementById('stat-future-usage');
+const statTime = document.getElementById('stat-time');
+const statTimeRow = document.getElementById('stat-time-row');
+const statMedalRow = document.getElementById('stat-medal-row');
+const statMedal = document.getElementById('stat-medal');
 
 // ═══ SCENE SETUP ═══
 const scene = new THREE.Scene();
@@ -153,6 +205,23 @@ let exitPortal = null;
 let portalParticles = null;
 let bridgeGapBounds = null;
 let room1RespawnPoint = null;
+
+// Feature 2: Energy Nodes
+const energyNodeMeshes = [];
+
+// Feature 4: Memory Fragments
+const memoryFragmentMeshes = [];
+const MEMORY_FRAGMENT_DATA = [
+  { id: 'frag1', title: 'LOG 01', text: 'Temporal Experiment Initiated.', pos: { x: 3, y: 1.5, z: -5 }, timeline: 'past' },
+  { id: 'frag2', title: 'LOG 02', text: 'Timeline Fracture Detected.', pos: { x: -3, y: 1.5, z: -30 }, timeline: 'future' },
+  { id: 'frag3', title: 'LOG 03', text: 'Reality Collapse Imminent.', pos: { x: 3, y: 1.5, z: -50 }, timeline: 'past' }
+];
+
+// Feature 5: False Portal
+let falsePortal = null;
+let falsePortalParticles = null;
+let realPortal = null;
+let realPortalParticles = null;
 
 const clock = new THREE.Clock();
 const keys = { w: false, a: false, s: false, d: false };
@@ -433,42 +502,74 @@ function buildRoom1() {
   tagTimeline(warningSign, 'future');
 }
 
-// ═══ ROOM 2: POWER RELAY ═══
+// ═══ ROOM 2: ENERGY CORE (Feature 2) ═══
+function createEnergyNode(id, x, y, z, timeline, label) {
+  const group = new THREE.Group();
+  group.position.set(x, y, z);
+
+  // Core cube
+  const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  const mat = new THREE.MeshStandardMaterial({
+    color: timeline === 'past' ? 0x003300 : 0x002233,
+    emissive: timeline === 'past' ? COLORS.past : COLORS.future,
+    emissiveIntensity: 0.6,
+    roughness: 0.4,
+    metalness: 0.5
+  });
+  const core = new THREE.Mesh(geo, mat);
+  group.add(core);
+
+  // Outer wireframe ring
+  const ringGeo = new THREE.TorusGeometry(0.45, 0.03, 8, 16);
+  const ringMat = new THREE.MeshStandardMaterial({
+    color: timeline === 'past' ? COLORS.past : COLORS.future,
+    emissive: timeline === 'past' ? COLORS.past : COLORS.future,
+    emissiveIntensity: 0.8,
+    transparent: true,
+    opacity: 0.6
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  // Point light
+  const light = new THREE.PointLight(timeline === 'past' ? COLORS.past : COLORS.future, 0.3, 4);
+  light.position.set(0, 0.5, 0);
+  group.add(light);
+
+  group.userData.interactive = true;
+  group.userData.interactType = 'energyNode';
+  group.userData.nodeId = id;
+  group.userData.interactRadius = 2;
+  group.userData.timeline = timeline;
+  group.userData.activated = false;
+  group.userData.coreMat = mat;
+  group.userData.ringMat = ringMat;
+  group.userData.nodeLight = light;
+
+  scene.add(group);
+  tagTimeline(group, timeline);
+  interactiveObjects.push(group);
+  energyNodeMeshes.push(group);
+  return group;
+}
+
 function buildRoom2() {
   const centerZ = -30;
   const depth = 20;
   createCorridorSegment(centerZ, depth, false);
-  createNarrativePanel(-4.7, 2.2, centerZ, 'Security lockdown active. Find the power relay.', Math.PI / 2);
+  createNarrativePanel(-4.7, 2.2, -25, 'Energy core offline. Activate all nodes to restore power.', Math.PI / 2);
 
-  const switchGeo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-  const switchMat = new THREE.MeshStandardMaterial({
-    color: 0x003300,
-    emissive: COLORS.past,
-    emissiveIntensity: 0.6,
-    roughness: 0.5,
-    metalness: 0.4
-  });
-  powerSwitch = new THREE.Mesh(switchGeo, switchMat);
-  powerSwitch.position.set(-4.5, 1.5, centerZ);
-  powerSwitch.userData.timeline = 'past';
-  powerSwitch.userData.interactive = true;
-  powerSwitch.userData.interactType = 'powerSwitch';
-  powerSwitch.userData.interactRadius = 1.5;
-  scene.add(powerSwitch);
-  tagTimeline(powerSwitch, 'past');
-  interactiveObjects.push(powerSwitch);
+  // Node A: Past timeline, left wall
+  createEnergyNode('a', -3.5, 1.5, -27, 'past', 'NODE A');
 
-  const switchPanel = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 0.8, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0x1a1a2e, roughness: 0.8 })
-  );
-  switchPanel.position.set(-4.55, 1.5, centerZ);
-  tagTimeline(switchPanel, 'past');
+  // Node B: Future timeline, right wall
+  createEnergyNode('b', 3.5, 1.5, -30, 'future', 'NODE B');
 
-  powerPanelLight = new THREE.PointLight(COLORS.past, 0, 5);
-  powerPanelLight.position.set(-4, 2.5, centerZ);
-  scene.add(powerPanelLight);
+  // Node C: Past timeline, center-back
+  createEnergyNode('c', 0, 1.5, -35, 'past', 'NODE C');
 
+  // Door blocking sector 3 (visible in both timelines until all nodes activated)
   const doorGeo = new THREE.BoxGeometry(3, 3.5, 0.4);
   const doorMat = new THREE.MeshStandardMaterial({
     color: 0x2a2a3e,
@@ -478,29 +579,28 @@ function buildRoom2() {
     emissiveIntensity: 0.15
   });
   futureDoor = new THREE.Mesh(doorGeo, doorMat);
-  futureDoor.position.set(0, 1.75, -22);
-  futureDoor.userData.timeline = 'future';
+  futureDoor.position.set(0, 1.75, -40);
   futureDoor.userData.collidable = true;
   futureDoor.userData.isDoor = true;
   scene.add(futureDoor);
-  tagTimeline(futureDoor, 'future');
   collidables.push(futureDoor);
 
   const doorFrame = new THREE.Mesh(
     new THREE.BoxGeometry(3.4, 3.8, 0.2),
     new THREE.MeshStandardMaterial({ color: 0x0f3460, emissive: 0x0f3460, emissiveIntensity: 0.2 })
   );
-  doorFrame.position.set(0, 1.9, -22);
-  tagTimeline(doorFrame, 'future');
+  doorFrame.position.set(0, 1.9, -40);
+  scene.add(doorFrame);
 }
 
-// ═══ ROOM 3: ESCAPE CHAMBER ═══
+// ═══ ROOM 3: ESCAPE CHAMBER (Feature 5: False Portal Twist) ═══
 function buildRoom3() {
   const centerZ = -50;
   const depth = 20;
   createCorridorSegment(centerZ, depth, true);
   createNarrativePanel(-4.7, 2.2, centerZ, 'Temporal core unstable. Exit before collapse.', Math.PI / 2);
 
+  // Past-only wall
   const wallGeo = new THREE.BoxGeometry(10, 4, 1);
   const wallMat = new THREE.MeshStandardMaterial({
     color: 0x2a2a2a,
@@ -514,24 +614,48 @@ function buildRoom3() {
   tagTimeline(exitWall, 'past');
   collidables.push(exitWall);
 
-  const portalGeo = new THREE.BoxGeometry(2, 3, 0.3);
-  const portalMat = new THREE.MeshStandardMaterial({
+  // False portal (visible in FUTURE initially)
+  const falsePortalGeo = new THREE.BoxGeometry(2, 3, 0.3);
+  const falsePortalMat = new THREE.MeshStandardMaterial({
     color: COLORS.future,
     emissive: COLORS.future,
     emissiveIntensity: 1,
     transparent: true,
     opacity: 0.9
   });
-  exitPortal = new THREE.Mesh(portalGeo, portalMat);
-  exitPortal.position.set(0, 1.5, -58);
-  exitPortal.userData.timeline = 'future';
-  exitPortal.userData.isPortal = true;
-  scene.add(exitPortal);
-  tagTimeline(exitPortal, 'future');
+  falsePortal = new THREE.Mesh(falsePortalGeo, falsePortalMat);
+  falsePortal.position.set(0, 1.5, -58);
+  falsePortal.userData.timeline = 'future';
+  falsePortal.userData.isFalsePortal = true;
+  scene.add(falsePortal);
+  tagTimeline(falsePortal, 'future');
 
-  portalParticles = createPortalRing(exitPortal.position);
-  scene.add(portalParticles);
-  tagTimeline(portalParticles, 'future');
+  falsePortalParticles = createPortalRing(falsePortal.position);
+  scene.add(falsePortalParticles);
+  tagTimeline(falsePortalParticles, 'future');
+
+  // Real portal (visible in PAST, spawns after false portal fails)
+  const realPortalGeo = new THREE.BoxGeometry(2, 3, 0.3);
+  const realPortalMat = new THREE.MeshStandardMaterial({
+    color: COLORS.past,
+    emissive: COLORS.past,
+    emissiveIntensity: 1,
+    transparent: true,
+    opacity: 0.9
+  });
+  realPortal = new THREE.Mesh(realPortalGeo, realPortalMat);
+  realPortal.position.set(0, 1.5, -58);
+  realPortal.userData.isPortal = true;
+  scene.add(realPortal);
+  realPortal.visible = false; // Hidden until false portal triggered
+
+  realPortalParticles = createPortalRing(realPortal.position);
+  scene.add(realPortalParticles);
+  realPortalParticles.visible = false;
+
+  // Keep exitPortal reference for backward compat with pulsing
+  exitPortal = falsePortal;
+  portalParticles = falsePortalParticles;
 
   createWall(0, 2, -60, 10, 4, 0.3, true);
 }
@@ -710,9 +834,36 @@ document.addEventListener('keyup', (e) => {
   if (k === 'KeyD') keys.d = false;
 });
 
-startOverlay.addEventListener('click', () => {
+startOverlay.addEventListener('click', (e) => {
+  if (e.target.classList.contains('mode-btn')) return;
   controls.lock();
 });
+
+// Feature 1: Mode selection
+btnStory.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameState.challengeMode = false;
+  btnStory.classList.add('mode-btn-active');
+  btnChallenge.classList.remove('mode-btn-active');
+});
+
+btnChallenge.addEventListener('click', (e) => {
+  e.stopPropagation();
+  gameState.challengeMode = true;
+  btnChallenge.classList.add('mode-btn-active');
+  btnStory.classList.remove('mode-btn-active');
+});
+
+// Feature 4: Load best time
+(function loadBestTime() {
+  try {
+    const best = localStorage.getItem('timeFracture_bestTime');
+    if (best) {
+      bestTimeDisplay.classList.remove('hidden');
+      bestTimeValue.textContent = formatTime(parseFloat(best));
+    }
+  } catch(e) {}
+})();
 
 controls.addEventListener('lock', () => {
   startOverlay.classList.add('hidden');
@@ -721,6 +872,18 @@ controls.addEventListener('lock', () => {
   gameState.playing = true;
   roomIndicator.classList.add('visible');
   updateRoomIndicator();
+
+  // Start timer for challenge mode
+  if (gameState.challengeMode && gameState.timerStartTime === 0) {
+    gameState.timerStartTime = performance.now();
+    challengeTimer.classList.remove('hidden');
+  }
+
+  // Show initial sector intro
+  if (!gameState.sectorsVisited[0]) {
+    gameState.sectorsVisited[0] = true;
+    showSectorIntro('SECTOR 01', 'BRIDGE CHAMBER');
+  }
 });
 
 controls.addEventListener('unlock', () => {
@@ -812,28 +975,61 @@ function rebuildCollidables() {
   scene.traverse((obj) => {
     if (obj.userData.collidable) {
       if (obj.userData.timeline && obj.userData.timeline !== gameState.timeline) return;
-      if (obj.userData.isDoor && gameState.switchActivated && gameState.timeline === 'future') return;
+      if (obj.userData.isDoor && gameState.energyNodesComplete) return;
       if (obj.visible !== false) collidables.push(obj);
     }
   });
 }
 
-// ═══ TIMELINE SYSTEM ═══
+// ═══ TIMELINE SYSTEM (Feature 1: Stability + Feature 3: Transition FX) ═══
 function switchTimeline(timeline) {
   if (!gameState.playing || gameState.won || gameState.timeline === timeline) return;
 
   gameState.timeline = timeline;
   gameState.timelineSwitches++;
 
+  // Feature 3: Timeline analytics
+  if (timeline === 'past') gameState.pastUsage++;
+  else gameState.futureUsage++;
+
+  // Feature 6: First Fracture achievement
+  if (gameState.timelineSwitches === 1) {
+    unlockAchievement('FIRST FRACTURE', 'Switch timeline for the first time');
+  }
+
+  // Feature 1: Reduce stability
+  gameState.stability = Math.max(0, gameState.stability - 10);
+  updateStabilityUI();
+
+  if (gameState.stability <= 0) {
+    triggerTemporalCollapse();
+    return;
+  }
+
+  // Feature 3: Enhanced flash
   timelineFlash.className = '';
   void timelineFlash.offsetWidth;
   timelineFlash.classList.add(timeline === 'past' ? 'flash-past' : 'flash-future');
+
+  // Feature 3: Chromatic distortion
+  chromaticOverlay.className = '';
+  void chromaticOverlay.offsetWidth;
+  chromaticOverlay.classList.add('glitch-active');
+
+  // Feature 3: Camera shake
+  triggerCameraShake();
 
   timelineLight.color.setHex(timeline === 'past' ? COLORS.past : COLORS.future);
   timelineLight.intensity = 1.2;
 
   timelineObjects.past.forEach((obj) => { obj.visible = timeline === 'past'; });
   timelineObjects.future.forEach((obj) => { obj.visible = timeline === 'future'; });
+
+  // Show real portal if it was spawned
+  if (gameState.realPortalSpawned && realPortal) {
+    realPortal.visible = (timeline === 'past');
+    realPortalParticles.visible = (timeline === 'past');
+  }
 
   updateDoorState();
   rebuildCollidables();
@@ -845,9 +1041,58 @@ function switchTimeline(timeline) {
   activeBurst = createTimelineBurst(pos, timeline);
 }
 
+// Feature 3: Camera shake
+let cameraShakeTime = 0;
+function triggerCameraShake() {
+  cameraShakeTime = 0.3;
+}
+
+function updateCameraShake(delta) {
+  if (cameraShakeTime > 0) {
+    cameraShakeTime -= delta;
+    const intensity = cameraShakeTime * 0.008;
+    camera.rotation.z = (Math.random() - 0.5) * intensity;
+    if (cameraShakeTime <= 0) {
+      camera.rotation.z = 0;
+    }
+  }
+}
+
+// Feature 1: Stability UI
+function updateStabilityUI() {
+  const pct = gameState.stability;
+  stabilityBarFill.style.width = pct + '%';
+  stabilityValue.textContent = pct + '%';
+
+  // Remove old classes
+  stabilityBarFill.classList.remove('warning', 'critical');
+  stabilityValue.classList.remove('warning', 'critical');
+
+  if (pct <= 20) {
+    stabilityBarFill.classList.add('critical');
+    stabilityValue.classList.add('critical');
+  } else if (pct <= 40) {
+    stabilityBarFill.classList.add('warning');
+    stabilityValue.classList.add('warning');
+  }
+}
+
+// Feature 1: Temporal Collapse
+function triggerTemporalCollapse() {
+  gameState.playing = false;
+  controls.unlock();
+  hud.classList.add('hidden');
+  temporalCollapse.classList.remove('hidden');
+  playTone(80, 1);
+  setTimeout(() => playTone(60, 1), 300);
+  setTimeout(() => {
+    window.location.reload();
+  }, 3000);
+}
+
 function updateDoorState() {
   if (!futureDoor) return;
-  const doorOpen = gameState.switchActivated && gameState.timeline === 'future';
+  const doorOpen = gameState.energyNodesComplete;
   futureDoor.visible = !doorOpen;
   rebuildCollidables();
 }
@@ -887,18 +1132,57 @@ function tryInteract() {
   const target = getNearestInteractive();
   if (!target) return;
 
-  if (target.userData.interactType === 'powerSwitch' && !gameState.switchActivated) {
-    gameState.switchActivated = true;
+  // Feature 2: Energy Node interaction
+  if (target.userData.interactType === 'energyNode' && !target.userData.activated) {
+    const nodeId = target.userData.nodeId;
+    gameState.energyNodes[nodeId] = true;
     target.userData.activated = true;
-    target.material.emissiveIntensity = 2;
-    target.material.color.setHex(COLORS.past);
 
-    if (powerPanelLight) {
-      powerPanelLight.intensity = 1.5;
-    }
+    // Visual feedback: glow up
+    target.userData.coreMat.emissiveIntensity = 2;
+    target.userData.coreMat.color.setHex(0xffffff);
+    target.userData.ringMat.emissiveIntensity = 2;
+    target.userData.nodeLight.intensity = 1.5;
 
     createSwitchBurst(target.position.clone());
-    updateDoorState();
+    playTone(660, 0.3);
+
+    // Count activated nodes
+    const count = Object.values(gameState.energyNodes).filter(Boolean).length;
+    energyNodeValue.textContent = count + ' / 3';
+
+    if (count >= 3) {
+      gameState.energyNodesComplete = true;
+      updateDoorState();
+      playTone(880, 0.5);
+      setTimeout(() => playTone(1100, 0.3), 200);
+      // Feature 6: Achievement
+      unlockAchievement('TEMPORAL ENGINEER', 'Activate all energy nodes');
+      // Feature 8: Unlock sound
+      setTimeout(() => playTone(1320, 0.2), 400);
+    }
+  }
+
+  // Feature 4: Memory Fragment interaction
+  if (target.userData.interactType === 'memoryFragment' && !target.userData.activated) {
+    target.userData.activated = true;
+    gameState.memoryFragments++;
+
+    // Hide the fragment
+    target.visible = false;
+
+    // Update counter
+    memoryValue.textContent = gameState.memoryFragments + ' / 3';
+
+    // Show popup
+    showMemoryPopup(target.userData.fragTitle, target.userData.fragText);
+    playTone(550, 0.3);
+    setTimeout(() => playTone(770, 0.2), 150);
+
+    // Feature 6: Achievement
+    if (gameState.memoryFragments >= 3) {
+      unlockAchievement('ARCHIVIST', 'Collect all memory fragments');
+    }
   }
 }
 
@@ -908,6 +1192,29 @@ function updateInteractionUI() {
 
   interactionPrompt.classList.toggle('hidden', !show);
   interactControlLine.classList.toggle('hidden', !show);
+
+  if (show && target) {
+    if (target.userData.interactType === 'energyNode') {
+      interactionPrompt.textContent = '[F] ACTIVATE ENERGY NODE';
+    } else if (target.userData.interactType === 'memoryFragment') {
+      interactionPrompt.textContent = '[F] COLLECT MEMORY FRAGMENT';
+    } else {
+      interactionPrompt.textContent = '[F] ACTIVATE POWER RELAY';
+    }
+  }
+}
+
+// Feature 4: Memory Popup
+let memoryPopupTimer = null;
+function showMemoryPopup(title, text) {
+  memoryPopup.querySelector('.memory-popup-title').textContent = title;
+  memoryPopup.querySelector('.memory-popup-text').textContent = text;
+  memoryPopup.classList.remove('hidden');
+
+  if (memoryPopupTimer) clearTimeout(memoryPopupTimer);
+  memoryPopupTimer = setTimeout(() => {
+    memoryPopup.classList.add('hidden');
+  }, 3000);
 }
 
 // ═══ HUD UPDATES ═══
@@ -936,6 +1243,13 @@ function updateRoomIndicator() {
       roomHint.textContent = zone.hint;
       roomIndicator.classList.add('visible');
     }, 100);
+
+    // Feature 5: Sector intro popups
+    if (!gameState.sectorsVisited[roomIdx]) {
+      gameState.sectorsVisited[roomIdx] = true;
+      const SECTOR_NAMES = ['BRIDGE CHAMBER', 'ENERGY RELAY', 'TEMPORAL ESCAPE CORE'];
+      showSectorIntro('SECTOR 0' + (roomIdx + 1), SECTOR_NAMES[roomIdx]);
+    }
   } else {
     roomText.textContent = zone.label;
     roomHint.textContent = zone.hint;
@@ -970,46 +1284,160 @@ function playTone(frequency, duration) {
   }
 }
 
-// ═══ WIN SEQUENCE ═══
+// ═══ WIN SEQUENCE (Enhanced Ending — Features 2,3,6,7) ═══
 function triggerWin() {
   if (gameState.won) return;
   gameState.won = true;
   gameState.playing = false;
-  controls.unlock();
 
+  // Calculate completion time
+  if (gameState.challengeMode && gameState.timerStartTime > 0) {
+    gameState.completionTime = (performance.now() - gameState.timerStartTime) / 1000;
+  }
+
+  controls.unlock();
   winFade.classList.add('active');
+
+  // Feature 6: Escape Artist achievement
+  unlockAchievement('ESCAPE ARTIST', 'Complete the game');
+
+  // Feature 8: Portal enter sound
+  playTone(440, 0.3);
+  setTimeout(() => playTone(660, 0.3), 100);
+  setTimeout(() => playTone(880, 0.4), 200);
 
   setTimeout(() => {
     hud.classList.add('hidden');
     winOverlay.classList.remove('hidden');
+
+    // Core stats
+    statFragments.textContent = gameState.memoryFragments + ' / 3';
+    statStability.textContent = gameState.stability + '%';
     statSwitches.textContent = gameState.timelineSwitches;
+
+    // Feature 3: Timeline analytics
+    statPastUsage.textContent = gameState.pastUsage;
+    statFutureUsage.textContent = gameState.futureUsage;
+
+    // Feature 1+2: Challenge mode time + medal
+    if (gameState.challengeMode && gameState.completionTime > 0) {
+      statTimeRow.classList.remove('hidden');
+      statTime.textContent = formatTime(gameState.completionTime);
+
+      // Medal
+      statMedalRow.classList.remove('hidden');
+      const t = gameState.completionTime;
+      let medalText, medalClass;
+      if (t < 45) {
+        medalText = '★ GOLD ★';
+        medalClass = 'medal-gold';
+      } else if (t <= 90) {
+        medalText = '◆ SILVER ◆';
+        medalClass = 'medal-silver';
+      } else {
+        medalText = '● BRONZE ●';
+        medalClass = 'medal-bronze';
+      }
+      statMedal.textContent = medalText;
+      statMedal.className = 'medal-display ' + medalClass;
+
+      // Feature 4: Save best time
+      saveBestTime(gameState.completionTime);
+    }
+
     playTone(523, 0.3);
     setTimeout(() => playTone(659, 0.3), 200);
     setTimeout(() => playTone(784, 0.5), 400);
   }, 1500);
 }
 
+// Feature 5: False Portal Check + Real Portal Check
 function checkPortalWin() {
-  if (!exitPortal || !exitPortal.visible || gameState.won) return;
   const pos = controls.getObject().position;
-  const dist = pos.distanceTo(exitPortal.position);
-  if (dist < 1.5 && gameState.timeline === 'future') {
-    triggerWin();
+  if (gameState.won) return;
+
+  // Check false portal approach
+  if (falsePortal && falsePortal.visible && !gameState.falsePortalTriggered) {
+    const dist = pos.distanceTo(falsePortal.position);
+    if (dist < 2 && gameState.timeline === 'future') {
+      triggerFalsePortal();
+    }
+  }
+
+  // Check real portal
+  if (realPortal && realPortal.visible && gameState.realPortalSpawned) {
+    const dist = pos.distanceTo(realPortal.position);
+    if (dist < 1.5 && gameState.timeline === 'past') {
+      triggerWin();
+    }
   }
 }
 
+function triggerFalsePortal() {
+  gameState.falsePortalTriggered = true;
+
+  // Portal fails — disappear
+  falsePortal.visible = false;
+  falsePortalParticles.visible = false;
+
+  // Show temporal lock message
+  temporalLockMsg.classList.remove('hidden');
+  playTone(120, 0.5);
+  setTimeout(() => playTone(90, 0.5), 200);
+
+  // Spawn real portal after delay
+  setTimeout(() => {
+    gameState.realPortalSpawned = true;
+    // Real portal is in PAST timeline
+    if (gameState.timeline === 'past') {
+      realPortal.visible = true;
+      realPortalParticles.visible = true;
+    }
+    temporalLockMsg.classList.add('hidden');
+    // Update hint
+    ROOM_ZONES[2].hint = 'Switch to PAST — the real portal awaits';
+    updateRoomIndicator();
+  }, 2500);
+}
+
 function updatePulsingObjects(elapsed) {
-  if (exitPortal && exitPortal.visible) {
+  // Pulse false portal if visible
+  if (falsePortal && falsePortal.visible) {
     const pulse = (Math.sin(elapsed * 2) + 1) * 0.5;
     const green = new THREE.Color(COLORS.past);
     const blue = new THREE.Color(COLORS.future);
-    exitPortal.material.emissive.copy(green).lerp(blue, pulse);
-    exitPortal.material.color.copy(exitPortal.material.emissive);
-    exitPortal.material.emissiveIntensity = 0.8 + pulse * 0.6;
+    falsePortal.material.emissive.copy(green).lerp(blue, pulse);
+    falsePortal.material.color.copy(falsePortal.material.emissive);
+    falsePortal.material.emissiveIntensity = 0.8 + pulse * 0.6;
   }
 
-  if (powerSwitch && powerSwitch.visible && !gameState.switchActivated) {
-    powerSwitch.material.emissiveIntensity = 0.4 + Math.sin(elapsed * 3) * 0.3;
+  // Pulse real portal if visible
+  if (realPortal && realPortal.visible) {
+    const pulse = (Math.sin(elapsed * 3) + 1) * 0.5;
+    realPortal.material.emissive.setHex(COLORS.past);
+    realPortal.material.color.setHex(COLORS.past);
+    realPortal.material.emissiveIntensity = 1 + pulse * 0.8;
+  }
+
+  // Pulse energy nodes (non-activated ones spin)
+  for (let i = 0; i < energyNodeMeshes.length; i++) {
+    const node = energyNodeMeshes[i];
+    if (node.visible && !node.userData.activated) {
+      node.children[0].rotation.y = elapsed * 1.5;
+      node.children[0].rotation.x = Math.sin(elapsed * 2) * 0.3;
+      node.children[1].rotation.z = elapsed * 0.5;
+      node.userData.coreMat.emissiveIntensity = 0.4 + Math.sin(elapsed * 3) * 0.3;
+    }
+  }
+
+  // Pulse memory fragments (floating bob)
+  for (let i = 0; i < memoryFragmentMeshes.length; i++) {
+    const frag = memoryFragmentMeshes[i];
+    if (frag.visible && !frag.userData.activated) {
+      frag.position.y = frag.userData.baseY + Math.sin(elapsed * 2 + i) * 0.15;
+      frag.children[0].rotation.y = elapsed * 1;
+      frag.children[0].rotation.x = elapsed * 0.5;
+    }
   }
 }
 
@@ -1018,6 +1446,7 @@ buildEntranceCorridor();
 buildRoom1();
 buildRoom2();
 buildRoom3();
+buildMemoryFragments();
 rebuildCollidables();
 updateHUDTimeline();
 
@@ -1025,6 +1454,48 @@ updateHUDTimeline();
   addFacilityLight(-3, 3.5, z);
   addFacilityLight(3, 3.5, z);
 });
+
+// Feature 4: Build Memory Fragments
+function buildMemoryFragments() {
+  for (let i = 0; i < MEMORY_FRAGMENT_DATA.length; i++) {
+    const data = MEMORY_FRAGMENT_DATA[i];
+    const group = new THREE.Group();
+    group.position.set(data.pos.x, data.pos.y, data.pos.z);
+
+    // Holographic cube
+    const geo = new THREE.BoxGeometry(0.35, 0.35, 0.35);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xcc66ff,
+      emissive: 0xcc66ff,
+      emissiveIntensity: 0.8,
+      transparent: true,
+      opacity: 0.7,
+      roughness: 0.2,
+      metalness: 0.8
+    });
+    const cube = new THREE.Mesh(geo, mat);
+    group.add(cube);
+
+    // Glow light
+    const light = new THREE.PointLight(0xcc66ff, 0.4, 3);
+    light.position.set(0, 0.3, 0);
+    group.add(light);
+
+    group.userData.interactive = true;
+    group.userData.interactType = 'memoryFragment';
+    group.userData.interactRadius = 2;
+    group.userData.timeline = data.timeline;
+    group.userData.activated = false;
+    group.userData.fragTitle = data.title;
+    group.userData.fragText = data.text;
+    group.userData.baseY = data.pos.y;
+
+    scene.add(group);
+    tagTimeline(group, data.timeline);
+    interactiveObjects.push(group);
+    memoryFragmentMeshes.push(group);
+  }
+}
 
 // ═══ ANIMATION LOOP ═══
 function animate() {
@@ -1035,6 +1506,15 @@ function animate() {
 
   if (gameState.respawnCooldown > 0) {
     gameState.respawnCooldown -= delta;
+  }
+
+  // Feature 3: Camera shake
+  updateCameraShake(delta);
+
+  // Feature 1: Update challenge timer
+  if (gameState.challengeMode && gameState.playing && !gameState.won && gameState.timerStartTime > 0) {
+    const elapsed_t = (performance.now() - gameState.timerStartTime) / 1000;
+    timerValue.textContent = formatTime(elapsed_t);
   }
 
   if (gameState.playing && !gameState.won && controls.isLocked) {
@@ -1062,12 +1542,117 @@ function animate() {
     checkPortalWin();
     updateRoomIndicator();
     updateInteractionUI();
+
+    // Feature 2: Show energy node panel in sector 2
+    const inSector2 = pos.z <= -20 && pos.z > -40;
+    energyNodePanel.classList.toggle('hidden', !inSector2 && !gameState.energyNodesComplete);
   }
 
   updateParticles(delta, elapsed);
   updatePulsingObjects(elapsed);
 
+  // Update real portal particles
+  if (realPortalParticles && realPortalParticles.visible) {
+    const posArr = realPortalParticles.geometry.attributes.position.array;
+    const angles = realPortalParticles.userData.angles;
+    const pp = realPortalParticles.userData.portalPos;
+    const radius = 1.8;
+    realPortalParticles.material.color.setHex(COLORS.past);
+
+    for (let i = 0; i < angles.length; i++) {
+      const a = angles[i] + elapsed * 0.8;
+      posArr[i * 3] = pp.x + Math.cos(a) * radius;
+      posArr[i * 3 + 1] = pp.y + Math.sin(a * 2 + elapsed) * 0.5;
+      posArr[i * 3 + 2] = pp.z + Math.sin(a) * radius * 0.3;
+    }
+    realPortalParticles.geometry.attributes.position.needsUpdate = true;
+  }
+
   renderer.render(scene, camera);
+}
+
+// ═══ UTILITY: Format time as MM:SS ═══
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+// ═══ FEATURE 4: Best Time System ═══
+function saveBestTime(time) {
+  try {
+    const prev = localStorage.getItem('timeFracture_bestTime');
+    if (!prev || time < parseFloat(prev)) {
+      localStorage.setItem('timeFracture_bestTime', time.toFixed(2));
+    }
+  } catch(e) {}
+}
+
+// ═══ FEATURE 5: Sector Intro Popups ═══
+let sectorIntroTimer = null;
+function showSectorIntro(label, name) {
+  sectorIntroLabel.textContent = label;
+  sectorIntroName.textContent = name;
+  sectorIntro.classList.remove('hidden');
+  // Re-trigger animation
+  sectorIntro.style.animation = 'none';
+  void sectorIntro.offsetWidth;
+  sectorIntro.style.animation = '';
+
+  if (sectorIntroTimer) clearTimeout(sectorIntroTimer);
+  sectorIntroTimer = setTimeout(() => {
+    sectorIntro.classList.add('hidden');
+  }, 3000);
+}
+
+// ═══ FEATURE 6: Achievement System ═══
+let achievementTimer = null;
+let achievementQueue = [];
+let achievementShowing = false;
+
+function unlockAchievement(title, desc) {
+  if (gameState.achievements[title]) return;
+  gameState.achievements[title] = true;
+
+  achievementQueue.push({ title, desc });
+  if (!achievementShowing) {
+    showNextAchievement();
+  }
+}
+
+function showNextAchievement() {
+  if (achievementQueue.length === 0) {
+    achievementShowing = false;
+    return;
+  }
+  achievementShowing = true;
+  const { title, desc } = achievementQueue.shift();
+
+  achievementTitle.textContent = title;
+  achievementDesc.textContent = desc;
+  achievementToast.classList.remove('hidden');
+  // Re-trigger animation
+  achievementToast.style.animation = 'none';
+  void achievementToast.offsetWidth;
+  achievementToast.style.animation = '';
+
+  // Play achievement sound
+  playTone(880, 0.15);
+  setTimeout(() => playTone(1100, 0.15), 100);
+  setTimeout(() => playTone(1320, 0.2), 200);
+
+  if (achievementTimer) clearTimeout(achievementTimer);
+  achievementTimer = setTimeout(() => {
+    achievementToast.classList.add('hidden');
+    setTimeout(() => showNextAchievement(), 300);
+  }, 3000);
+}
+
+// ═══ FEATURE 8: Enhanced Audio ═══
+function playChord(freqs, duration) {
+  freqs.forEach((f, i) => {
+    setTimeout(() => playTone(f, duration), i * 80);
+  });
 }
 
 window.addEventListener('resize', () => {
