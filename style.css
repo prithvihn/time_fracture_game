@@ -900,6 +900,56 @@ html, body {
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
 
+/* ═══ PORTAL LOCKED MSG ═══ */
+#portal-locked-msg {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 55;
+  pointer-events: none;
+  animation: lock-msg-in 0.5s ease-out;
+}
+
+.lock-progress {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: #00cfff;
+  letter-spacing: 3px;
+  margin-top: 14px;
+}
+
+/* Portal Online notification */
+#portal-online-msg {
+  position: fixed;
+  top: 35%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 55;
+  pointer-events: none;
+  animation: lock-msg-in 0.5s ease-out;
+}
+
+.portal-online-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #00ff88;
+  letter-spacing: 4px;
+  text-shadow: 0 0 20px #00ff88;
+}
+
+.portal-online-sub {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  color: #00cfff;
+  letter-spacing: 3px;
+  margin-top: 8px;
+}
+
 /* ═══ CHROMATIC OVERLAY ═══ */
 #chromatic-overlay {
   position: fixed;

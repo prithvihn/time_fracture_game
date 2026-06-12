@@ -166,6 +166,8 @@ const statTime = document.getElementById('stat-time');
 const statTimeRow = document.getElementById('stat-time-row');
 const statMedalRow = document.getElementById('stat-medal-row');
 const statMedal = document.getElementById('stat-medal');
+const portalLockedMsg = document.getElementById('portal-locked-msg');
+const portalLockProgress = document.getElementById('portal-lock-progress');
 
 // ═══ SCENE SETUP ═══
 const scene = new THREE.Scene();
@@ -1094,7 +1096,24 @@ function updateDoorState() {
   if (!futureDoor) return;
   const doorOpen = gameState.energyNodesComplete;
   futureDoor.visible = !doorOpen;
+
+  // Update portal visual state
+  updatePortalLockState();
   rebuildCollidables();
+}
+
+function updatePortalLockState() {
+  // False portal: red if locked, normal if unlocked
+  if (falsePortal) {
+    if (gameState.energyNodesComplete) {
+      falsePortal.material.color.setHex(COLORS.future);
+      falsePortal.material.emissive.setHex(COLORS.future);
+    } else {
+      falsePortal.material.color.setHex(COLORS.danger);
+      falsePortal.material.emissive.setHex(COLORS.danger);
+    }
+  }
+  // Real portal color is always green (past) — no change needed
 }
 
 function updateGridColors() {
@@ -1160,6 +1179,8 @@ function tryInteract() {
       unlockAchievement('TEMPORAL ENGINEER', 'Activate all energy nodes');
       // Feature 8: Unlock sound
       setTimeout(() => playTone(1320, 0.2), 400);
+      // Show portal online notification
+      showPortalOnline();
     }
   }
 
@@ -1287,6 +1308,13 @@ function playTone(frequency, duration) {
 // ═══ WIN SEQUENCE (Enhanced Ending — Features 2,3,6,7) ═══
 function triggerWin() {
   if (gameState.won) return;
+
+  // VALIDATION: All energy nodes must be activated
+  const nodesActivated = Object.values(gameState.energyNodes).filter(Boolean).length;
+  if (nodesActivated < 3) {
+    return;
+  }
+
   gameState.won = true;
   gameState.playing = false;
 
@@ -1360,6 +1388,11 @@ function checkPortalWin() {
   if (falsePortal && falsePortal.visible && !gameState.falsePortalTriggered) {
     const dist = pos.distanceTo(falsePortal.position);
     if (dist < 2 && gameState.timeline === 'future') {
+      // Gate behind energy nodes
+      if (!gameState.energyNodesComplete) {
+        showPortalLockedWarning();
+        return;
+      }
       triggerFalsePortal();
     }
   }
@@ -1368,9 +1401,67 @@ function checkPortalWin() {
   if (realPortal && realPortal.visible && gameState.realPortalSpawned) {
     const dist = pos.distanceTo(realPortal.position);
     if (dist < 1.5 && gameState.timeline === 'past') {
+      // Gate behind energy nodes
+      if (!gameState.energyNodesComplete) {
+        showPortalLockedWarning();
+        return;
+      }
       triggerWin();
     }
   }
+}
+
+// Portal locked warning
+let portalLockedTimer = null;
+let portalLockedCooldown = false;
+function showPortalLockedWarning() {
+  if (portalLockedCooldown) return;
+  portalLockedCooldown = true;
+
+  const count = Object.values(gameState.energyNodes).filter(Boolean).length;
+  portalLockProgress.textContent = 'ENERGY NODES: ' + count + ' / 3';
+  portalLockedMsg.classList.remove('hidden');
+  // Re-trigger animation
+  portalLockedMsg.style.animation = 'none';
+  void portalLockedMsg.offsetWidth;
+  portalLockedMsg.style.animation = '';
+
+  playTone(120, 0.4);
+  setTimeout(() => playTone(90, 0.3), 150);
+
+  if (portalLockedTimer) clearTimeout(portalLockedTimer);
+  portalLockedTimer = setTimeout(() => {
+    portalLockedMsg.classList.add('hidden');
+    portalLockedCooldown = false;
+  }, 2500);
+}
+
+// Portal Online notification
+function showPortalOnline() {
+  // Re-use temporalLockMsg position/style temporarily
+  temporalLockMsg.querySelector('.lock-title').textContent = '✓ TEMPORAL POWER RESTORED';
+  temporalLockMsg.querySelector('.lock-title').style.color = '#00ff88';
+  temporalLockMsg.querySelector('.lock-title').style.textShadow = '0 0 20px #00ff88';
+  temporalLockMsg.querySelector('.lock-hint').textContent = 'PORTAL ONLINE';
+  temporalLockMsg.querySelector('.lock-hint').style.color = '#00cfff';
+  temporalLockMsg.classList.remove('hidden');
+  temporalLockMsg.style.animation = 'none';
+  void temporalLockMsg.offsetWidth;
+  temporalLockMsg.style.animation = '';
+
+  playTone(660, 0.3);
+  setTimeout(() => playTone(880, 0.3), 150);
+  setTimeout(() => playTone(1100, 0.4), 300);
+
+  setTimeout(() => {
+    temporalLockMsg.classList.add('hidden');
+    // Reset styles for later use by false portal
+    temporalLockMsg.querySelector('.lock-title').textContent = '⚠ TEMPORAL LOCK DETECTED';
+    temporalLockMsg.querySelector('.lock-title').style.color = '';
+    temporalLockMsg.querySelector('.lock-title').style.textShadow = '';
+    temporalLockMsg.querySelector('.lock-hint').textContent = 'Timeline Mismatch — Switch Timeline';
+    temporalLockMsg.querySelector('.lock-hint').style.color = '';
+  }, 3000);
 }
 
 function triggerFalsePortal() {
@@ -1404,11 +1495,19 @@ function updatePulsingObjects(elapsed) {
   // Pulse false portal if visible
   if (falsePortal && falsePortal.visible) {
     const pulse = (Math.sin(elapsed * 2) + 1) * 0.5;
-    const green = new THREE.Color(COLORS.past);
-    const blue = new THREE.Color(COLORS.future);
-    falsePortal.material.emissive.copy(green).lerp(blue, pulse);
-    falsePortal.material.color.copy(falsePortal.material.emissive);
-    falsePortal.material.emissiveIntensity = 0.8 + pulse * 0.6;
+    if (gameState.energyNodesComplete) {
+      // Unlocked: green-to-blue pulse
+      const green = new THREE.Color(COLORS.past);
+      const blue = new THREE.Color(COLORS.future);
+      falsePortal.material.emissive.copy(green).lerp(blue, pulse);
+      falsePortal.material.color.copy(falsePortal.material.emissive);
+      falsePortal.material.emissiveIntensity = 0.8 + pulse * 0.6;
+    } else {
+      // Locked: red pulse
+      falsePortal.material.emissive.setHex(COLORS.danger);
+      falsePortal.material.color.setHex(COLORS.danger);
+      falsePortal.material.emissiveIntensity = 0.4 + pulse * 0.3;
+    }
   }
 
   // Pulse real portal if visible
